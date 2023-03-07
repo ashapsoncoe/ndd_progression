@@ -5,7 +5,7 @@ import numpy as np
 from plotly.subplots import make_subplots
 from collections import Counter
 
-sustain_output_dir = 'C:\\Users\\alexs\\Documents\\acf_work\\pc_dementia70_all_130_cortical_regions_3events_25startpoints_2maxclusters_100000iterations_130biomarkers\\pickle_files\\pc_dementia70_all_130_cortical_regions_subtype1.pickle'
+sustain_output_dir = 'path/to/your/sustain/output_file.pickle'
 
 
 brain_regions_xyz_lookup = {
