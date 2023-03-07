@@ -596,239 +596,137 @@ if __name__ == '__main__':
 
 
 
-subtypes = range(len(sustain_output['samples_sequence']))
+    subtypes = range(len(sustain_output['samples_sequence']))
 
-type_counts = Counter([int(x) for x in sustain_output['ml_subtype'].flatten()])
+    type_counts = Counter([int(x) for x in sustain_output['ml_subtype'].flatten()])
 
-if len(subtypes) <= 3:
-    rows=1
-    cols=len(subtypes)
-else:
-    assert len(subtypes) <= 6
-    rows = 2
-    cols = len(subtypes)/2
-
-fig = make_subplots(
-    rows = rows,
-    cols = cols,
-    specs=[[{"type": "scatter3d"}, {"type": "scatter3d"}]],
-    subplot_titles=tuple([f'Subtype {x+1} (n = {type_counts[x]})' for x in subtypes]),
-    )
-
-
-
-for subtype in subtypes:
-
-    if subtype <= 2:
-        row = 1
-        col = subtype+1
+    if len(subtypes) <= 3:
+        rows=1
+        cols=len(subtypes)
     else:
-        row = 2
-        col = subtype-3+1
+        assert len(subtypes) <= 6
+        rows = 2
+        cols = len(subtypes)/2
+
+    fig = make_subplots(
+        rows = rows,
+        cols = cols,
+        specs=[[{"type": "scatter3d"}, {"type": "scatter3d"}]],
+        subplot_titles=tuple([f'Subtype {x+1} (n = {type_counts[x]})' for x in subtypes]),
+        )
 
 
-    print('subtype', subtype)
-    modes = np.array(mode(sustain_output['samples_sequence'][subtype], axis=1)[0]).flatten()
-    medians = np.median(sustain_output['samples_sequence'][subtype], axis=1)
-    medians = medians.reshape(sustain_output['Z_vals'].shape, order='F')
-
-
-    for pos, r in enumerate(medians):
-
-        try:
-            assert sorted(r) == list(r)
-        except AssertionError:
-            print(pos, r)
-
-
-    z_vals_per_stage = {}
-
-    for stage in range(sustain_output['samples_sequence'][subtype].shape[0]):
-
-        z_vals = []
-
-        for br_prog, br_z in zip(medians, sustain_output['Z_vals']):
-            br_prog = [0] + list(br_prog)
-            br_z = [0] + list(br_z)
-            ix = br_prog.index(max([x for x in br_prog if stage>=x]))
-            z_val = round(br_z[ix], 2)
-            z_vals.append(z_val)
-        
-        z_vals_per_stage[stage+1] = z_vals
-
-    num_stages = len(z_vals_per_stage.keys())
-    print(num_stages)
-
-    regions_plotted = [x for x in sustain_output['region_names'] if x in biobank_to_oxford_brain_region_lookup]
-    ix_regions_included = [sustain_output['region_names'].index(x) for x in regions_plotted]
-
-    medians = medians[ix_regions_included, :]
-    Z_vals = sustain_output['Z_vals'][ix_regions_included, :]
-
-    rel_locs = [brain_regions_xyz_lookup[biobank_to_oxford_brain_region_lookup[reg]] for reg in regions_plotted]
-    x_coords, y_coords, z_coords = zip(*rel_locs)
-    raw_sizes = [mean_volumes_from_all_ukbiobank_data[reg] for reg in regions_plotted]
-
-    sizes = [x/max(raw_sizes)*100 for x in raw_sizes]
-    labels = [biobank_to_oxford_brain_region_lookup[reg] for reg in regions_plotted]
-
-    frames = []
-    # Add traces, one for each slider step
-    for stage in z_vals_per_stage.keys():
-
-        _ = fig.add_trace(
-            go.Scatter3d(
-                visible=False, 
-                x=x_coords, 
-                y=y_coords, 
-                z=z_coords, 
-                mode='markers',
-                text=labels,
-                textposition="top center",
-                marker=dict(
-                    size=sizes,
-                    color=z_vals_per_stage[stage],           # set color to an array/list of desired values
-                    coloraxis="coloraxis",
-                    #colorscale='Viridis',   # choose a colorscale
-                    #color_continuous_scale=[(0, "blue"), (0.43, "green"), (0.86, "red"), (1.38, 'orange')],
-                    opacity=0.8
-                )
-
-                ),
-
-                row=row,
-                col=col)
-
-    # Make starting trace visible
-    fig.data[subtype*num_stages].visible = True
-
-
-# Create and add slider
-steps = []
-for i in range(num_stages):
-    step = dict(
-        method="update",
-        args=[{"visible": [False] * len(fig.data)},
-            {"title": "SUSTAIN Stage: " + str(i+1)}],  # layout attribute
-    )
 
     for subtype in subtypes:
-        step["args"][0]["visible"][i+num_stages*subtype] = True  # Toggle i'th trace to "visible"
 
-    steps.append(step)
-
-sliders = [dict(
-    active=0,
-    currentvalue={},#"prefix": "SUSTAIN Stage: "},
-    pad={"t": 50},
-    steps=steps
-)]
-
-_ = fig.update_layout(sliders=sliders, coloraxis=dict(colorscale='Bluered_r',cmin=0, cmax = sustain_output['Z_vals'].max()), showlegend=False)
-
-fig.show()
+        if subtype <= 2:
+            row = 1
+            col = subtype+1
+        else:
+            row = 2
+            col = subtype-3+1
 
 
-
-'''For 3D sync - didn't work though
-
-import plotly.graph_objs as go
-import pandas as pd
-from plotly import tools
-
-# Read data from a csv
-z_data = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/api_docs/mt_bruno_elevation.csv')
-
-trace1 = dict(type='surface', scene='scene1', z=z_data.values)
-
-trace2 = dict(type='surface', scene='scene2', z=z_data.values, colorscale='viridis')
-
-f= tools.make_subplots(rows=1, cols=2, specs=[[{'is_3d': True}, {'is_3d': True}]])
-
-f.append_trace(trace1, 1, 1)
-f.append_trace(trace2, 1, 2)
-
-fig = go.FigureWidget(f)
-
-def cam_change(layout, camera):
-    fig.layout.scene2.camera = camera
-
-fig.layout.scene1.on_change(cam_change, 'camera')
-'''
+        print('subtype', subtype)
+        modes = np.array(mode(sustain_output['samples_sequence'][subtype], axis=1)[0]).flatten()
+        medians = np.median(sustain_output['samples_sequence'][subtype], axis=1)
+        medians = medians.reshape(sustain_output['Z_vals'].shape, order='F')
 
 
+        for pos, r in enumerate(medians):
+
+            try:
+                assert sorted(r) == list(r)
+            except AssertionError:
+                print(pos, r)
 
 
+        z_vals_per_stage = {}
+
+        for stage in range(sustain_output['samples_sequence'][subtype].shape[0]):
+
+            z_vals = []
+
+            for br_prog, br_z in zip(medians, sustain_output['Z_vals']):
+                br_prog = [0] + list(br_prog)
+                br_z = [0] + list(br_z)
+                ix = br_prog.index(max([x for x in br_prog if stage>=x]))
+                z_val = round(br_z[ix], 2)
+                z_vals.append(z_val)
+
+            z_vals_per_stage[stage+1] = z_vals
+
+        num_stages = len(z_vals_per_stage.keys())
+        print(num_stages)
+
+        regions_plotted = [x for x in sustain_output['region_names'] if x in biobank_to_oxford_brain_region_lookup]
+        ix_regions_included = [sustain_output['region_names'].index(x) for x in regions_plotted]
+
+        medians = medians[ix_regions_included, :]
+        Z_vals = sustain_output['Z_vals'][ix_regions_included, :]
+
+        rel_locs = [brain_regions_xyz_lookup[biobank_to_oxford_brain_region_lookup[reg]] for reg in regions_plotted]
+        x_coords, y_coords, z_coords = zip(*rel_locs)
+        raw_sizes = [mean_volumes_from_all_ukbiobank_data[reg] for reg in regions_plotted]
+
+        sizes = [x/max(raw_sizes)*100 for x in raw_sizes]
+        labels = [biobank_to_oxford_brain_region_lookup[reg] for reg in regions_plotted]
+
+        frames = []
+        # Add traces, one for each slider step
+        for stage in z_vals_per_stage.keys():
+
+            _ = fig.add_trace(
+                go.Scatter3d(
+                    visible=False, 
+                    x=x_coords, 
+                    y=y_coords, 
+                    z=z_coords, 
+                    mode='markers',
+                    text=labels,
+                    textposition="top center",
+                    marker=dict(
+                        size=sizes,
+                        color=z_vals_per_stage[stage],           # set color to an array/list of desired values
+                        coloraxis="coloraxis",
+                        #colorscale='Viridis',   # choose a colorscale
+                        #color_continuous_scale=[(0, "blue"), (0.43, "green"), (0.86, "red"), (1.38, 'orange')],
+                        opacity=0.8
+                    )
+
+                    ),
+
+                    row=row,
+                    col=col)
+
+        # Make starting trace visible
+        fig.data[subtype*num_stages].visible = True
 
 
-'''
-import numpy as np
-import plotly.graph_objects as go
+    # Create and add slider
+    steps = []
+    for i in range(num_stages):
+        step = dict(
+            method="update",
+            args=[{"visible": [False] * len(fig.data)},
+                {"title": "SUSTAIN Stage: " + str(i+1)}],  # layout attribute
+        )
 
-x = [1,3,4,5,6,2,6]
-y = [6,2,3,7,1,3,6]
-z = [4,1,7,3,8,4,3]
-c = [
-    [1,4,8,3,5,2,3],
-    [1,4,2,3,1,2,3],
-    [1,4,8,3,5,2,3],
-    [1,7,8,4,5,2,3],
-    [1,4,8,3,5,1,3],
-    [8,4,8,2,5,2,3],
-]
+        for subtype in subtypes:
+            step["args"][0]["visible"][i+num_stages*subtype] = True  # Toggle i'th trace to "visible"
 
+        steps.append(step)
 
+    sliders = [dict(
+        active=0,
+        currentvalue={},#"prefix": "SUSTAIN Stage: "},
+        pad={"t": 50},
+        steps=steps
+    )]
 
-# Create figure
-fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode="markers", marker=dict(size=10)))
+    _ = fig.update_layout(sliders=sliders, coloraxis=dict(colorscale='Bluered_r',cmin=0, cmax = sustain_output['Z_vals'].max()), showlegend=False)
 
-frames = [go.Frame(data = [go.Scatter3d(x=x,y=y, z=z, marker=dict(color = c[k]))], traces= [1], name=f'frame{k}') for k  in  range(len(x)-1)]
-
-fig.update(frames=frames)
-
-sliders = [
-    {"pad": {"b": 10, "t": 60},
-     "len": 0.9,
-     "x": 0.1,
-     "y": 0,
-     
-     "steps": [
-                 {"args": [[f.name], {
-                                        "frame": {"duration": 0},
-                                        "mode": "immediate",
-                                        "fromcurrent": True,
-                                        "transition": {"duration": 0, "easing": "linear"},
-                                        }
-                                        ],
-                  "label": str(k),
-                  "method": "animate",
-                  } for k, f in enumerate(fig.frames)
-              ]
-     }
-        ]
-
-fig.update_layout(sliders=sliders, coloraxis={"colorscale": [(0, "red"), (0.5, "yellow"), (1, "green")]})
-
-fig.show()
-
-
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-
-fig = make_subplots(rows=1, cols=2, shared_yaxes=True)
-
-fig.add_trace(go.Bar(x=[1, 2, 3], y=[4, 5, 6],
-                    marker=dict(color=[4, 5, 6], coloraxis="coloraxis")),
-              1, 1)
-
-fig.add_trace(go.Bar(x=[1, 2, 3], y=[2, 3, 5],
-                    marker=dict(color=[2, 3, 5], coloraxis="coloraxis")),
-              1, 2)
-
-fig.update_layout(coloraxis=dict(colorscale='Bluered_r'), showlegend=False)
-fig.show()
-'''
-
+    fig.show()
 
 
 
